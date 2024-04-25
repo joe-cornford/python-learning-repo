@@ -1,0 +1,122 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import numpy as np
+
+def ingress(df):
+    '''
+    Takes uploaded data and changes SEX column to Male and Female.
+    Converts DOB to datetime and caluclates age.
+
+    arguments:
+    df: DataFrame with 903 header info
+
+    returns:
+    df: DataFrame with cleaned data and added AGE column
+    '''
+
+    df['SEX'] = df['SEX'].map(
+        {1:'Male',
+         2:'Female'}
+    )
+
+    # Generates AGE column as INT
+    df['DOB'] = pd.to_datetime(df['DOB'], format='%d/%m/%Y', errors='coerce')
+    df['AGE'] = pd.to_datetime('today').normalize() - df['DOB']
+    df['AGE'] = (df['AGE']/np.timedelta64(1, 'Y')).astype('int')
+
+    # Tidies column
+    df = df[['SEX', 'ETHNIC', 'AGE']]
+
+    return df
+
+
+def gender_plot(df):
+    '''
+    Takes cleaned 903 data to plot gender and ethnicity.
+    '''
+    fig = px.histogram(df, 
+                       x='SEX',
+                       color='ETHNIC',
+                       title='903 Gender and Ethnicity Breakdown',
+                       labels={'SEX':'Sex',
+                               'ETHNIC':'Ethnicity',
+                               'count':'Number of Children'})
+
+    return fig
+
+def ethnic_pie(df):
+    '''
+    Takes cleaned 903 data to plot pie chart of ethnicity breakdown
+    '''
+    df_count = df.groupby('ETHNIC')['ETHNIC'].count().reset_index(name='count')
+
+    fig = px.pie(df_count, 
+                 values='count', 
+                 names='ETHNIC',
+                 title='Ethnicity breakdown')
+
+    return fig
+
+
+st.title('903 analysis tool')
+
+upload = st.file_uploader('Upload 903 header here')
+
+if upload: 
+    df = pd.read_csv(upload)
+
+    df = ingress(df)
+
+    # Average age
+    av_age = round(df['AGE'].mean())
+
+    # Most represented ethnicity
+    ethnic_count = df.groupby('ETHNIC')['ETHNIC'].count().reset_index(name='count')
+    ethnic_count.sort_values('count', ascending=False, inplace=True)
+    most_represented = ethnic_count.iloc[0]['ETHNIC']
+    least_represented = ethnic_count.iloc[-1]['ETHNIC']
+
+    # Total number of children
+    total_children = len(df)
+
+    # Total number of each SEX
+    total_male = len(df[df['SEX'] == 'Male'])
+    total_female = len(df[df['SEX'] == 'Female'])
+
+    st.write(f'The average age is {av_age}.')
+    st.write(f'The most represented ethnicity is: {most_represented}, the least represented is: {least_represented}.')
+    st.write(f'The total number of children is: {total_children}.')
+    st.write(f'The total number of male children is: {total_male}, the total number of female children is {total_female}.') 
+    st.write(f'The male/female ratio is {total_male / total_female}.')
+
+    lowest_age = int(df['AGE'].min())
+    highest_age = int(df['AGE'].max())
+
+    with st.sidebar:
+        age_boundaries = st.sidebar.slider(
+            "Age range selection",
+            min_value=lowest_age,
+            max_value=highest_age,
+            value=[lowest_age, highest_age]
+        )
+
+        ethnicities = st.sidebar.multiselect(
+            'Select ethnicities for data view:',
+            options=df['ETHNIC'].unique(),
+            default=df['ETHNIC'].unique()
+        )
+
+    ethnic_condition = df['ETHNIC'].isin(ethnicities)
+
+    age_condition = (df['AGE'] >= age_boundaries[0]) & (df['AGE'] <= age_boundaries[1])
+
+    df = df[age_condition & ethnic_condition]
+
+    st.dataframe(df)
+
+    gender_fig = gender_plot(df)
+    st.plotly_chart(gender_fig)
+
+    ethnic_pie_chart = ethnic_pie(df)
+    st.plotly_chart(ethnic_pie_chart)

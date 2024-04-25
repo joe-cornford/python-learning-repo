@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
+
 # utilities
 
 def data_cleaner(df):
@@ -63,3 +64,31 @@ if upload is not None:
 
     ethnicity_pie_fig = ethnicity_pie(df_clean)
     st.plotly_chart(ethnicity_pie_fig)
+
+st.title('903 analysis tool')
+
+upload = st.file_uploader('upload 903 header here')
+
+if upload:
+    df = pd.read_csv(upload)
+
+    df = data_cleaner(df)
+
+    lowest_age = int(df['AGE'].min())
+    highest_age = int(df['AGE'].max())
+
+
+    with st.sidebar:
+        low_age_bound = st.sidebar.slider(
+            "Age range selection",
+            min_value = lowest_age,
+            max_value = highest_age,
+            value=[lowest_age, highest_age])
+        
+upper_age_bound = df['AGE'].max()
+
+age_condition = (df['AGE'] >= low_age_bound) & (df['AGE'] <= upper_age_bound)
+
+df = df[age_condition]
+
+st.dataframe(df)
